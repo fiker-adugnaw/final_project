@@ -1,0 +1,20 @@
+{
+  "name": "ai-legal-assistance-platform",
+  "version": "1.0.0",
+  "description": "AI-Enabled Legal Assistance and Lawyer Directory Platform - Ethiopia",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "start": "npm run start --workspace=backend",
+    "client": "npm run start --workspace=frontend",
+    "server": "npm run dev --workspace=backend",
+    "dev": "concurrently \"npm run start --workspace=frontend\" \"npm run dev --workspace=backend\"",
+    "install-all": "npm install && npm install --workspace=frontend && npm install --workspace=backend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.1"
+  }
+}

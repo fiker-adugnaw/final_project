@@ -1,0 +1,340 @@
+openapi: 3.0.3
+info:
+  title: AI Legal Assistance Platform API
+  description: |
+    RESTful API for the AI-Enabled Legal Assistance and Lawyer Directory Platform.
+    
+    ## Ethiopian Law Only
+    The AI assistant is restricted exclusively to Ethiopian law (FDRE Constitution, 
+    Proclamations, Criminal Code, Civil Code, etc.). Queries involving foreign 
+    jurisdictions are flagged and redirected.
+    
+    ## Bilingual Support
+    All endpoints support both **Amharic** and **English** via the `Accept-Language` 
+    header or user preference.
+    
+    ## Authentication
+    Use `Bearer <accessToken>` in the `Authorization` header for protected routes.
+    Tokens expire in 7 days. Use `POST /auth/refresh` to get a new access token.
+
+  version: "1.0.0"
+  contact:
+    name: AI Legal Platform Support
+    email: support@ailegalplatform.et
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:5000/api/v1
+    description: Local Development
+  - url: https://api.ailegalplatform.et/api/v1
+    description: Production
+
+tags:
+  - name: Auth
+    description: Authentication and account security
+  - name: Users
+    description: User profile management
+  - name: Lawyers
+    description: Lawyer directory and profiles
+  - name: Clients
+    description: Client management
+  - name: Volunteers
+    description: Volunteer advisor management
+  - name: Appointments
+    description: Appointment scheduling
+  - name: Documents
+    description: Legal document management
+  - name: AI
+    description: AI legal assistant
+  - name: Forum
+    description: Legal Q&A community forum
+  - name: Notifications
+    description: User notifications
+  - name: Admin
+    description: Admin panel (Admin role only)
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Success:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+        data:
+          type: object
+
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        status:
+          type: string
+          example: fail
+        code:
+          type: string
+          example: NOT_FOUND
+        message:
+          type: string
+        details:
+          type: object
+
+    Pagination:
+      type: object
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        pages:
+          type: integer
+        hasNext:
+          type: boolean
+        hasPrev:
+          type: boolean
+
+    User:
+      type: object
+      properties:
+        _id:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+        fullName:
+          type: string
+        userType:
+          type: string
+          enum: [CLIENT, LAWYER, VOLUNTEER_ADVISOR, VOLUNTEER_REPRESENTATIVE, ADMIN]
+        isVerified:
+          type: boolean
+        languagePreference:
+          type: string
+          enum: [Amharic, English]
+        region:
+          type: string
+        city:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    AIQuery:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          minLength: 5
+          maxLength: 5000
+          description: Legal question (Amharic or English)
+        language:
+          type: string
+          enum: [Amharic, English]
+
+    AIResponse:
+      type: object
+      properties:
+        responseId:
+          type: string
+        query:
+          type: string
+        response:
+          type: string
+        queryLanguage:
+          type: string
+        jurisdictionDetected:
+          type: string
+          enum: [ETHIOPIAN, FOREIGN, MIXED, UNKNOWN]
+        requiresWarning:
+          type: boolean
+        warningMessage:
+          type: string
+        disclaimer:
+          type: string
+        processingTime:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fullName, email, phone, password, confirmPassword, userType]
+              properties:
+                fullName:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                phone:
+                  type: string
+                  example: "0911234567"
+                password:
+                  type: string
+                confirmPassword:
+                  type: string
+                userType:
+                  type: string
+                  enum: [CLIENT, LAWYER, VOLUNTEER_ADVISOR, VOLUNTEER_REPRESENTATIVE]
+                languagePreference:
+                  type: string
+                  enum: [Amharic, English]
+      responses:
+        "201":
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Success"
+        "409":
+          description: Email or phone already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login with email or phone + password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                phone:
+                  type: string
+                password:
+                  type: string
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  accessToken:
+                    type: string
+                  refreshToken:
+                    type: string
+                  user:
+                    $ref: "#/components/schemas/User"
+        "401":
+          description: Invalid credentials
+        "423":
+          description: Account locked
+
+  /ai/query:
+    post:
+      tags: [AI]
+      summary: Submit a legal question to the AI assistant
+      description: |
+        Submits a legal question and receives an AI-generated response based 
+        **exclusively on Ethiopian law**. Foreign jurisdiction queries are blocked.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AIQuery"
+            examples:
+              English:
+                value:
+                  query: "What are the grounds for divorce under Ethiopian family law?"
+              Amharic:
+                value:
+                  query: "በኢትዮጵያ የቤተሰብ ህግ መሰረት ፍቺ ምክንያቶች ምን ምን ናቸው?"
+      responses:
+        "200":
+          description: AI response generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/AIResponse"
+        "400":
+          description: Non-legal query or foreign jurisdiction detected
+        "429":
+          description: AI query rate limit exceeded
+
+  /lawyers:
+    get:
+      tags: [Lawyers]
+      summary: Get a paginated list of verified lawyers
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+        - in: query
+          name: practiceArea
+          schema:
+            type: string
+        - in: query
+          name: region
+          schema:
+            type: string
+        - in: query
+          name: language
+          schema:
+            type: string
+            enum: [Amharic, English]
+      responses:
+        "200":
+          description: List of verified lawyers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/User"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
